@@ -1,110 +1,102 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
 
-# --- CONFIGURACIÓN VISUAL NCAA D1 (OLIVE EDITION) ---
-st.set_page_config(layout="wide", page_title="LAROCHE PERFORMANCE | OLIVE PROGRAM")
+# Configuración de la página
+st.set_page_config(page_title="Laroche Stats Pro", layout="wide")
 
+# Estilo Verde Oliva
 st.markdown("""
     <style>
-    /* Fondo principal: Gris muy oscuro casi negro para que el oliva resalte */
-    .stApp {
-        background-color: #0B0E11;
-        color: #FFFFFF;
-        font-family: 'Inter', sans-serif;
-    }
-    
-    /* Título con estilo de Universidad NCAA */
-    h1 {
-        color: #808000; /* Verde Oliva */
-        font-family: 'Arial Black', sans-serif;
-        text-transform: uppercase;
-        letter-spacing: -1px;
-        border-left: 10px solid #808000;
-        padding-left: 20px;
-        margin-bottom: 20px;
-    }
-
-    /* Estilo de los Botones: Tipografía bloque NCAA */
-    div.stButton > button {
-        background-color: #808000 !important; /* Verde Oliva del Equipo */
-        color: white !important;
-        border: 2px solid #556B2F !important;
-        border-radius: 4px !important; /* Menos redondeado, más bloque */
-        height: 85px !important;
-        font-family: 'Oswald', sans-serif; /* Tipografía condensada tipo NCAA */
-        font-weight: 800 !important;
-        font-size: 22px !important;
-        text-transform: uppercase;
-        box-shadow: 0 4px #556B2F;
-        transition: all 0.1s ease;
-    }
-
-    /* Efecto al pulsar el botón */
-    div.stButton > button:active {
-        box-shadow: 0 0 #556B2F;
-        transform: translateY(4px);
-    }
-
-    /* Botones de Alerta/Defensa (un tono más oscuro para diferenciar) */
-    [data-testid="stVerticalBlock"] > div:nth-child(2) div.stButton > button {
-        background-color: #4B5320 !important; /* Army Green */
-    }
-
-    /* Selector de Jugador */
-    .stSelectbox label {
-        color: #808000 !important;
+    .stButton>button {
+        background-color: #556B2F;
+        color: white;
+        border-radius: 10px;
+        height: 50px;
+        width: 100%;
         font-weight: bold;
-        font-size: 18px;
+    }
+    .stMetric {
+        background-color: #f0f2f6;
+        padding: 10px;
+        border-radius: 10px;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- CABECERA ---
-st.markdown("# LAROCHE BASKETBALL")
-st.markdown("##### ELITE SCOUTING UNIT | OLIVE PROGRAM")
+st.title("🏀 LAROCHE STATS - MODO PARTIDO")
 
-# --- ROSTER ACTUALIZADO (Con Miguel Dolz) ---
-ROSTER = [
-    "2-LUCAS MÁS", "3-NACHO SERRA", "5-ADRIAN OJEDA", "8-OSCAR MORANA", 
-    "9-ANDREU ESTELLÉS", "11-ALEJANDRO PELLICER", "12-DAVID NAVÍO", 
-    "15-JOAN AMER", "18-GABI OFICIAL", "21-MARC ALÓS", 
-    "23-ANTONIO PERANDRÉS", "24-CARLOS MÁS", "28-DERIN AKYUZ", 
-    "32-GONZALO RODRÍGUEZ", "50-ADRIAN FERRER", "82-MIGUEL DOLZ", "99-PEPE MÁS"
-]
+# --- SECCIÓN 1: CONFIGURACIÓN ---
+with st.expander("📝 Configuración del Partido"):
+    col_config1, col_config2 = st.columns(2)
+    with col_config1:
+        rival = st.text_input("Equipo Rival", "Rival")
+    with col_config2:
+        fecha = st.date_input("Fecha del Partido")
 
-if 'session_stats' not in st.session_state:
-    st.session_state.session_stats = []
+# --- SECCIÓN 2: BASE DE DATOS ---
+jugadores = ["MIGUEL DOLZ", "PEPE MÁS", "JORGE GIL", "HUGO MARQUÉS", "PABLO GADEA", 
+             "GONZALO C.", "CARLOS BELTRÁN", "IÑAKI LÓPEZ", "NICO GIMÉNEZ", 
+             "ALEX ROMERO", "ÁLVARO CH."]
 
-def registrar(p, acc, cat):
-    st.session_state.session_stats.append({
-        "Hora": datetime.now().strftime("%H:%M:%S"),
-        "Jugador": p, "Acción": acc, "Categoría": cat
-    })
-    st.toast(f"LOGGED: {p} - {acc}", icon="🏀")
+# Inicializar estado si no existe
+if 'stats' not in st.session_state:
+    st.session_state.stats = {j: {"T2_A": 0, "T2_F": 0, "T3_A": 0, "T3_F": 0, "TL_A": 0, "TL_F": 0, 
+                                  "REB": 0, "PT": 0, "STAMPEDE": 0} for j in jugadores}
 
-# --- INTERFAZ DE CAPTURA ---
-st.divider()
-jugador_sel = st.selectbox("ATHLETE IN FOCUS:", ROSTER)
+# --- SECCIÓN 3: INTERFAZ DE REGISTRO ---
+tab1, tab2 = st.tabs(["📊 Registro en Vivo", "📈 Visualización y Reporte"])
 
-col1, col2 = st.columns(2)
+with tab1:
+    for j in jugadores:
+        with st.container():
+            col_nom, col_t2, col_t3, col_otros = st.columns([2, 2, 2, 3])
+            
+            with col_nom:
+                st.subheader(j)
+                puntos = (st.session_state.stats[j]["T2_A"] * 2) + \
+                         (st.session_state.stats[j]["T3_A"] * 3) + \
+                         (st.session_state.stats[j]["TL_A"] * 1)
+                st.write(f"**Puntos: {puntos}**")
 
-with col1:
-    st.subheader("⚔️ THE WHEEL OFFENSE")
-    st.button("🏀 POINTS SCORE", on_click=registrar, args=(jugador_sel, "Puntos", "Off"), use_container_width=True)
-    st.button("🚨 PAINT TOUCH < 8s", on_click=registrar, args=(jugador_sel, "PT_8s", "Off"), use_container_width=True)
-    st.button("🔄 STAMPEDE ATTACK", on_click=registrar, args=(jugador_sel, "Stampede", "Off"), use_container_width=True)
-    st.button("✂️ 45° / BACKDOOR", on_click=registrar, args=(jugador_sel, "Corte", "Off"), use_container_width=True)
+            with col_t2:
+                c1, c2 = st.columns(2)
+                if c1.button(f"+2", key=f"t2a_{j}"): st.session_state.stats[j]["T2_A"] += 1
+                if c2.button(f"F2", key=f"t2f_{j}"): st.session_state.stats[j]["T2_F"] += 1
+            
+            with col_t3:
+                c3, c4 = st.columns(2)
+                if c3.button(f"+3", key=f"t3a_{j}"): st.session_state.stats[j]["T3_A"] += 1
+                if c4.button(f"F3", key=f"t3f_{j}"): st.session_state.stats[j]["T3_F"] += 1
 
-with col2:
-    st.subheader("🛡️ IRON WALL DEFENSE")
-    st.button("👣 FEET DEFENSE (OK)", on_click=registrar, args=(jugador_sel, "Pies_OK", "Def"), use_container_width=True)
-    st.button("❌ HANDS FOUL", on_click=registrar, args=(jugador_sel, "Manos_Error", "Def"), use_container_width=True)
-    st.button("🏃 DEFENSIVE SPRINT", on_click=registrar, args=(jugador_sel, "Sprint", "Def"), use_container_width=True)
-    st.button("⚠️ TURNOVER", on_click=registrar, args=(jugador_sel, "Perdida", "Error"), use_container_width=True)
+            with col_otros:
+                c5, c6, c7 = st.columns(3)
+                if c5.button(f"REB", key=f"reb_{j}"): st.session_state.stats[j]["REB"] += 1
+                if c6.button(f"PT", key=f"pt_{j}"): st.session_state.stats[j]["PT"] += 1
+                if c7.button(f"STP", key=f"stp_{j}"): st.session_state.stats[j]["STAMPEDE"] += 1
+            st.divider()
 
-# --- ZONA DE EXPORTACIÓN ---
-st.divider()
-if st.session_state.session_stats:
-    df = pd.DataFrame(st.session_state.session_stats)
-    st.download_button("📥 DOWNLOAD GAME DATA (CSV)", df.to_csv(index=False), "NCAA_Laroche_Game.csv")
+with tab2:
+    st.header(f"Resumen vs {rival}")
+    
+    # Crear DataFrame para cálculos
+    df = pd.DataFrame(st.session_state.stats).T
+    df['Puntos'] = (df['T2_A']*2) + (df['T3_A']*3) + (df['TL_A']*1)
+    
+    # Gráficas visuales rápidas
+    st.subheader("Puntos por Jugador")
+    st.bar_chart(df['Puntos'])
+    
+    st.subheader("Rebotes por Jugador")
+    st.bar_chart(df['REB'])
+
+    # Tabla detallada
+    st.dataframe(df)
+
+    # Botón de Descarga
+    csv = df.to_csv().encode('utf-8')
+    st.download_button("📥 DESCARGAR INFORME PARTIDO (CSV)", csv, f"stats_{rival}_{fecha}.csv", "text/csv")
+
+if st.button("🗑️ REINICIAR PARTIDO"):
+    st.session_state.stats = {j: {"T2_A": 0, "T2_F": 0, "T3_A": 0, "T3_F": 0, "TL_A": 0, "TL_F": 0, 
+                                  "REB": 0, "PT": 0, "STAMPEDE": 0} for j in jugadores}
+    st.rerun()
