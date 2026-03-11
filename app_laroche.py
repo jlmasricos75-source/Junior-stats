@@ -1,102 +1,93 @@
 import streamlit as st
 import pandas as pd
+from datetime import datetime
 
-# Configuración de la página
-st.set_page_config(page_title="Laroche Stats Pro", layout="wide")
+st.set_page_config(page_title="Laroche Club Analytics", layout="wide")
 
-# Estilo Verde Oliva
-st.markdown("""
-    <style>
-    .stButton>button {
-        background-color: #556B2F;
-        color: white;
-        border-radius: 10px;
-        height: 50px;
-        width: 100%;
-        font-weight: bold;
-    }
-    .stMetric {
-        background-color: #f0f2f6;
-        padding: 10px;
-        border-radius: 10px;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+# --- CONFIGURACIÓN DE PLANTILLAS ---
+# Fijos del A
+fijos_a = ["NACHO", "OSCAR", "JOAN", "GABI", "MARC", "FERRER", "PEPE"]
+# Los que doblan (el resto de los 17)
+doblan = ["LUCAS MÁS", "MIGUEL DOLZ", "JORGE GIL", "HUGO MARQUÉS", "PABLO GADEA", 
+          "GONZALO C.", "CARLOS BELTRÁN", "IÑAKI LÓPEZ", "NICO GIMÉNEZ", "ALEX ROMERO"]
 
-st.title("🏀 LAROCHE STATS - MODO PARTIDO")
+if 'log' not in st.session_state: st.session_state.log = []
+if 'jugador_activo' not in st.session_state: st.session_state.jugador_activo = None
 
-# --- SECCIÓN 1: CONFIGURACIÓN ---
-with st.expander("📝 Configuración del Partido"):
-    col_config1, col_config2 = st.columns(2)
-    with col_config1:
-        rival = st.text_input("Equipo Rival", "Rival")
-    with col_config2:
-        fecha = st.date_input("Fecha del Partido")
-
-# --- SECCIÓN 2: BASE DE DATOS ---
-jugadores = ["MIGUEL DOLZ", "PEPE MÁS", "JORGE GIL", "HUGO MARQUÉS", "PABLO GADEA", 
-             "GONZALO C.", "CARLOS BELTRÁN", "IÑAKI LÓPEZ", "NICO GIMÉNEZ", 
-             "ALEX ROMERO", "ÁLVARO CH."]
-
-# Inicializar estado si no existe
-if 'stats' not in st.session_state:
-    st.session_state.stats = {j: {"T2_A": 0, "T2_F": 0, "T3_A": 0, "T3_F": 0, "TL_A": 0, "TL_F": 0, 
-                                  "REB": 0, "PT": 0, "STAMPEDE": 0} for j in jugadores}
-
-# --- SECCIÓN 3: INTERFAZ DE REGISTRO ---
-tab1, tab2 = st.tabs(["📊 Registro en Vivo", "📈 Visualización y Reporte"])
-
-with tab1:
-    for j in jugadores:
-        with st.container():
-            col_nom, col_t2, col_t3, col_otros = st.columns([2, 2, 2, 3])
-            
-            with col_nom:
-                st.subheader(j)
-                puntos = (st.session_state.stats[j]["T2_A"] * 2) + \
-                         (st.session_state.stats[j]["T3_A"] * 3) + \
-                         (st.session_state.stats[j]["TL_A"] * 1)
-                st.write(f"**Puntos: {puntos}**")
-
-            with col_t2:
-                c1, c2 = st.columns(2)
-                if c1.button(f"+2", key=f"t2a_{j}"): st.session_state.stats[j]["T2_A"] += 1
-                if c2.button(f"F2", key=f"t2f_{j}"): st.session_state.stats[j]["T2_F"] += 1
-            
-            with col_t3:
-                c3, c4 = st.columns(2)
-                if c3.button(f"+3", key=f"t3a_{j}"): st.session_state.stats[j]["T3_A"] += 1
-                if c4.button(f"F3", key=f"t3f_{j}"): st.session_state.stats[j]["T3_F"] += 1
-
-            with col_otros:
-                c5, c6, c7 = st.columns(3)
-                if c5.button(f"REB", key=f"reb_{j}"): st.session_state.stats[j]["REB"] += 1
-                if c6.button(f"PT", key=f"pt_{j}"): st.session_state.stats[j]["PT"] += 1
-                if c7.button(f"STP", key=f"stp_{j}"): st.session_state.stats[j]["STAMPEDE"] += 1
-            st.divider()
-
-with tab2:
-    st.header(f"Resumen vs {rival}")
+# --- SIDEBAR: GESTIÓN DE CLUB ---
+with st.sidebar:
+    st.header("🏢 Control de Equipo")
+    equipo_hoy = st.radio("PARTIDO DE HOY:", ["JUNIOR A", "JUNIOR B"], horizontal=True)
     
-    # Crear DataFrame para cálculos
-    df = pd.DataFrame(st.session_state.stats).T
-    df['Puntos'] = (df['T2_A']*2) + (df['T3_A']*3) + (df['TL_A']*1)
+    # Lógica de visibilidad
+    if equipo_hoy == "JUNIOR A":
+        pool_jugadores = sorted(fijos_a + doblan)
+    else:
+        pool_jugadores = sorted(doblan) # En el B solo salen los que doblan
     
-    # Gráficas visuales rápidas
-    st.subheader("Puntos por Jugador")
-    st.bar_chart(df['Puntos'])
+    st.divider()
+    convocados = st.multiselect("📋 Jugadores Disponibles:", pool_jugadores, default=pool_jugadores[:5])
     
-    st.subheader("Rebotes por Jugador")
-    st.bar_chart(df['REB'])
+    st.divider()
+    quinteto = st.multiselect("⛹️ EN PISTA (Quinteto):", convocados, max_selections=5)
+    
+    if st.button("🗑️ REINICIAR PARTIDO"):
+        st.session_state.log = []
+        st.rerun()
 
-    # Tabla detallada
-    st.dataframe(df)
+# --- INTERFAZ DE CAPTURA ---
+st.title(f"🏀 {equipo_hoy} - MODO LIVE")
 
-    # Botón de Descarga
-    csv = df.to_csv().encode('utf-8')
-    st.download_button("📥 DESCARGAR INFORME PARTIDO (CSV)", csv, f"stats_{rival}_{fecha}.csv", "text/csv")
+if len(quinteto) < 5:
+    st.warning("Selecciona los 5 jugadores en pista en el menú de la izquierda.")
+else:
+    # FILA DE BOTONES DE JUGADORES
+    cols = st.columns(5)
+    for i, j in enumerate(quinteto):
+        if cols[i].button(j, key=f"btn_{j}", use_container_width=True, 
+                          type="primary" if st.session_state.jugador_activo == j else "secondary"):
+            st.session_state.jugador_activo = j
 
-if st.button("🗑️ REINICIAR PARTIDO"):
-    st.session_state.stats = {j: {"T2_A": 0, "T2_F": 0, "T3_A": 0, "T3_F": 0, "TL_A": 0, "TL_F": 0, 
-                                  "REB": 0, "PT": 0, "STAMPEDE": 0} for j in jugadores}
-    st.rerun()
+    # ACCIONES RÁPIDAS (Si hay jugador seleccionado)
+    if st.session_state.jugador_activo:
+        st.info(f"Registrando para: {st.session_state.jugador_activo}")
+        
+        c1, c2, c3, c4 = st.columns(4)
+        with c1:
+            if st.button("✅ T2"): acc, pts = "T2A", 2
+            if st.button("❌ T2"): acc, pts = "T2F", 0
+        with c2:
+            if st.button("✅ T3"): acc, pts = "T3A", 3
+            if st.button("❌ T3"): acc, pts = "T3F", 0
+        with c3:
+            if st.button("🛡️ REB"): acc, pts = "REB", 0
+            if st.button("🤝 ASIST"): acc, pts = "AST", 0
+        with c4:
+            if st.button("👟 PERD"): acc, pts = "TOV", 0
+            if st.button("🛡️ ROBO"): acc, pts = "STL", 0
+
+        if 'acc' in locals():
+            st.session_state.log.append({
+                "Fecha": datetime.now().strftime("%d/%m/%Y"),
+                "Equipo": equipo_hoy,
+                "Jugador": st.session_state.jugador_activo,
+                "Acción": acc,
+                "Pts": pts,
+                "Lineup": "-".join(sorted(quinteto))
+            })
+            st.session_state.jugador_activo = None
+            st.rerun()
+
+# --- BOX SCORE DINÁMICO ---
+if st.session_state.log:
+    st.divider()
+    df = pd.DataFrame(st.session_state.log)
+    
+    # Filtro opcional para ver historial
+    ver_todo = st.toggle("Ver estadísticas de toda la temporada (acumulado)")
+    
+    df_ver = df if ver_todo else df[df['Equipo'] == equipo_hoy]
+    
+    st.subheader(f"📊 Estadísticas {equipo_hoy if not ver_todo else 'Club Completo'}")
+    box_score = df_ver.groupby("Jugador").agg({'Pts': 'sum', 'Acción': 'count'}).rename(columns={'Acción': 'Acciones Totales'})
+    st.dataframe(box_score, use_container_width=True)
