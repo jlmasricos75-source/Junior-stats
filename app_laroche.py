@@ -2,105 +2,119 @@ import streamlit as st
 import pandas as pd
 import time
 
-st.set_page_config(page_title="Laroche Stats Pro", layout="wide")
+st.set_page_config(page_title="Laroche Tactical Board", layout="wide")
 
-# --- DATA OFICIAL ---
+# --- CONFIGURACIÓN DE MÉTRICAS ---
 fijos_a = ["3.-NACHO SERRA", "8.-OSCAR MORANA", "15.-JOAN AMER", "18.-GABI OFICIAL", "21.-MARC ALÓS", "50.-ADRIAN FERRER", "99.-PEPE MÁS"]
 junior_b = ["2.-LUCAS MÁS", "5.-ADRIAN OJEDA", "9.-ANDREU ESTELLÉS", "11.-ALEJANDRO PELLICER", "12.-DAVID NAVÍO", "23.-ANTONIO PERANDRÉS", "24.-CARLOS MÁS", "28.-DERIN AKYUZ", "32.-GONZALO", "82.-MIGUEL DOLZ"]
-medidas = ["Paint Touch", "Corte", "Transición", "ExtraPass+Tiro", "Tiro Reemplazo", "Stampede"]
 
-# --- INICIALIZACIÓN SEGURA ---
+# Tus 7 medidas especiales (Añadida Paint Touch < 8")
+especiales = ["PT < 8''", "Paint Touch", "Corte", "Transición", "ExtraPass+Tiro", "Tiro Reemplazo", "Stampede"]
+zonas = ["Bajo Aro", "Pintura", "Media IZQ", "Media DER", "T3 Esq IZQ", "T3 Esq DER", "T3 Frontal"]
+
+# --- ESTADO DE SESIÓN ---
 if 'log' not in st.session_state: st.session_state.log = []
 if 'inicio' not in st.session_state: st.session_state.inicio = None
 if 'jugador_sel' not in st.session_state: st.session_state.jugador_sel = None
+if 'zona_sel' not in st.session_state: st.session_state.zona_sel = None
+if 'puntos_rival' not in st.session_state: st.session_state.puntos_rival = 0
 
-# --- FUNCIONES DE APOYO ---
 def obtener_tiempo():
-    if st.session_state.inicio is None:
-        return "00:00"
-    t_segundos = int(time.time() - st.session_state.inicio)
-    mins, segs = divmod(t_segundos, 60)
-    return f"{mins:02d}:{segs:02d}"
+    if st.session_state.inicio is None: return "00:00"
+    t = int(time.time() - st.session_state.inicio)
+    return f"{t//60:02d}:{t%60:02d}"
 
-# --- SIDEBAR ---
+# --- SIDEBAR: GESTIÓN ---
 with st.sidebar:
-    st.header("⚙️ Panel de Control")
-    equipo = st.radio("EQUIPO:", ["JUNIOR A", "JUNIOR B"])
-    pool = sorted(fijos_a + junior_b) if equipo == "JUNIOR A" else sorted(junior_b)
-    quinteto = st.multiselect("QUINTETO EN PISTA:", pool, max_selections=5)
-    
+    st.header("🆚 MARCADOR")
+    st.session_state.puntos_rival = st.number_input("Rival:", min_value=0, value=st.session_state.puntos_rival)
     st.divider()
-    # Botón de Inicio con confirmación visual
-    if st.button("🚀 INICIAR PARTIDO / RESET", use_container_width=True):
+    equipo = st.radio("EQUIPO LAROCHE:", ["JUNIOR A", "JUNIOR B"])
+    pool = sorted(fijos_a + junior_b) if equipo == "JUNIOR A" else sorted(junior_b)
+    quinteto = st.multiselect("EN PISTA:", pool, max_selections=5)
+    if st.button("🚀 INICIAR / RESET"):
         st.session_state.inicio = time.time()
         st.session_state.log = []
-        st.session_state.jugador_sel = None
         st.rerun()
 
-    if st.session_state.inicio:
-        st.success(f"⏱️ Reloj activo: {obtener_tiempo()}")
+# --- MARCADOR Y RELOJ ---
+puntos_laroche = sum(d['Pts'] for d in st.session_state.log if 'Pts' in d)
+c1, c2, c3 = st.columns(3)
+c1.metric("LAROCHE", puntos_laroche)
+c2.metric("RIVAL", st.session_state.puntos_rival)
+c3.metric("RELOJ VÍDEO", obtener_tiempo())
+st.divider()
 
-# --- INTERFAZ PRINCIPAL ---
-st.title(f"📊 Laroche {equipo}")
-
-# CAPA DE SEGURIDAD 1: Si no hay reloj, no hay botones
 if st.session_state.inicio is None:
-    st.warning("⚠️ El sistema está en espera. Pulsa 'INICIAR PARTIDO' en el menú lateral para activar la toma de datos.")
-# CAPA DE SEGURIDAD 2: Si no hay quinteto, avisar
+    st.warning("⚠️ Pulsa 'INICIAR' en el lateral.")
 elif len(quinteto) < 5:
-    st.info("👈 Selecciona los 5 jugadores que están en pista ahora mismo.")
+    st.info("👈 Selecciona los 5 jugadores.")
 else:
-    # 1. SELECTOR DE JUGADOR
-    st.write("### 1. Selecciona Jugador")
+    # PASO 1: JUGADOR
+    st.write("### 1. Jugador")
     cols_j = st.columns(5)
     for i, j in enumerate(quinteto):
-        label = f"🏀 {j}" if st.session_state.jugador_sel == j else j
-        if cols_j[i].button(label, key=f"j_{j}", use_container_width=True, 
-                            type="primary" if st.session_state.jugador_sel == j else "secondary"):
+        if cols_j[i].button(j, key=f"j_{j}", use_container_width=True, type="primary" if st.session_state.jugador_sel == j else "secondary"):
             st.session_state.jugador_sel = j
 
-    # 2. SELECTOR DE ACCIÓN
     if st.session_state.jugador_sel:
-        st.divider()
-        t_marcado = obtener_tiempo()
-        st.subheader(f"Registrando para: {st.session_state.jugador_sel} (Min {t_marcado})")
-        
-        # FILOSOFÍA (Medidas Especiales)
-        st.markdown("#### ✨ FILOSOFÍA LAROCHE")
-        c1, c2, c3 = st.columns(3)
-        for idx, m in enumerate(medidas):
-            target_col = [c1, c2, c3][idx % 3]
-            if target_col.button(f"🎯 {m}", key=f"m_{m}", use_container_width=True):
+        # PASO 2: ZONA
+        st.write("### 2. Zona")
+        cols_z = st.columns(len(zonas))
+        for i, z in enumerate(zonas):
+            if cols_z[i].button(z, key=f"z_{z}", use_container_width=True, type="primary" if st.session_state.zona_sel == z else "secondary"):
+                st.session_state.zona_sel = z
+
+        if st.session_state.zona_sel:
+            # PASO 3: ACCIÓN Y RESULTADO
+            st.write(f"### 3. Acción de {st.session_state.jugador_sel}")
+            col_l, col_r = st.columns(2)
+            
+            with col_l:
+                st.markdown("#### 📊 Convencional")
+                sub1, sub2 = st.columns(2)
+                if sub1.button("✅ CANASTA 2P", use_container_width=True): acc, pts = "T2-Acierto", 2
+                if sub2.button("🎯 TRIPLE 3P", use_container_width=True): acc, pts = "T3-Acierto", 3
+                if sub1.button("❌ FALLO 2P", use_container_width=True): acc, pts = "T2-Fallo", 0
+                if sub2.button("⭕ FALLO 3P", use_container_width=True): acc, pts = "T3-Fallo", 0
+                if sub1.button("🚀 REB. OFF", use_container_width=True): acc, pts = "REB-O", 0
+                if sub2.button("🛡️ REB. DEF", use_container_width=True): acc, pts = "REB-D", 0
+                if sub1.button("🏀 TL ACERT", use_container_width=True): acc, pts = "TL-A", 1
+                if sub2.button("🚫 TL FALLO", use_container_width=True): acc, pts = "TL-F", 0
+                if sub1.button("👟 PÉRDIDA", use_container_width=True): acc, pts = "TOV", 0
+                if sub2.button("🤝 ASIST", use_container_width=True): acc, pts = "AST", 0
+
+            with col_r:
+                st.markdown("#### ✨ Especiales (Filosofía)")
+                grid = st.columns(2)
+                for idx, m in enumerate(especiales):
+                    if grid[idx % 2].button(f"⚡ {m}", key=f"m_{m}", use_container_width=True):
+                        # Al pulsar especial, pedimos desenlace
+                        st.session_state.medida_temp = m
+                
+                if 'medida_temp' in st.session_state:
+                    st.write(f"¿Cómo acabó el **{st.session_state.medida_temp}**?")
+                    res_cols = st.columns(3)
+                    if res_cols[0].button("✅ Metió 2P", key="res1"): acc, pts = f"{st.session_state.medida_temp}-T2A", 2
+                    if res_cols[0].button("🎯 Metió 3P", key="res2"): acc, pts = f"{st.session_state.medida_temp}-T3A", 3
+                    if res_cols[1].button("❌ Falló", key="res3"): acc, pts = f"{st.session_state.medida_temp}-Fallo", 0
+                    if res_cols[2].button("👟 Pérdida", key="res4"): acc, pts = f"{st.session_state.medida_temp}-Pérdida", 0
+                    if res_cols[2].button("🤝 Solo Pase", key="res5"): acc, pts = f"{st.session_state.medida_temp}-Pase", 0
+
+            if 'acc' in locals():
                 st.session_state.log.append({
-                    "Min": t_marcado, "Jugador": st.session_state.jugador_sel,
-                    "Tipo": "FILOSOFÍA", "Acción": m
+                    "Min": obtener_tiempo(), "Jugador": st.session_state.jugador_sel,
+                    "Zona": st.session_state.zona_sel, "Acción": acc, "Pts": pts
                 })
+                # Limpiar estados
                 st.session_state.jugador_sel = None
+                st.session_state.zona_sel = None
+                if 'medida_temp' in st.session_state: del st.session_state.medida_temp
                 st.rerun()
 
-        # CONVENCIONAL
-        st.markdown("#### 📊 CONVENCIONAL")
-        cv1, cv2, cv3, cv4 = st.columns(4)
-        if cv1.button("✅ CANASTA", use_container_width=True): acc = "Canasta"
-        if cv2.button("❌ FALLO", use_container_width=True): acc = "Fallo"
-        if cv3.button("🛡️ REB", use_container_width=True): acc = "Rebote"
-        if cv4.button("👟 PERD", use_container_width=True): acc = "Pérdida"
-
-        if 'acc' in locals():
-            st.session_state.log.append({
-                "Min": t_marcado, "Jugador": st.session_state.jugador_sel,
-                "Tipo": "CONVENCIONAL", "Acción": acc
-            })
-            st.session_state.jugador_sel = None
-            st.rerun()
-
-# --- TABLA DE DATOS ---
+# --- VISUALIZACIÓN ---
 if st.session_state.log:
-    st.divider()
     df = pd.DataFrame(st.session_state.log)
-    st.write("📝 Últimas acciones (para control de vídeo):")
+    st.divider()
+    st.subheader("📝 Historial de Jugadas")
     st.dataframe(df.iloc[::-1], use_container_width=True)
-    
-    # Botón para descargar
-    csv = df.to_csv(index=False).encode('utf-8')
-    st.download_button("📥 Descargar CSV", csv, "partido_laroche.csv", "text/csv")
