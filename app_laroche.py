@@ -1,77 +1,109 @@
 import streamlit as st
 import pandas as pd
+import datetime
 
-# 1. Configuración de la página (Debe ser lo primero)
-st.set_page_config(page_title="Scouting ADN", layout="wide")
+# 1. CONFIGURACIÓN BÁSICA (Evitamos funciones interactivas pesadas)
+st.set_page_config(
+    page_title="Scouting ADN v57",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 
-# 2. Inyección de CSS (CORREGIDO: Ahora está dentro de un string de Python)
+# 2. CSS COMPATIBLE (Sin variables CSS complejas que Safari antiguo no lee)
 st.markdown("""
     <style>
-    :root {
-        --primary: #0047ab;
-        --bg: #f4f7f6;
-        --shadow: 0 4px 6px rgba(0,0,0,0.1);
+    body {
+        background-color: #f0f2f6;
     }
-    .main {
-        background-color: var(--bg);
-    }
-    .stButton>button {
+    .stButton > button {
         width: 100%;
-        border-radius: 10px;
-        height: 3.5em;
-        font-weight: bold;
-        margin-bottom: 10px;
+        height: 70px !important;
+        font-size: 1.5rem !important;
+        font-weight: bold !important;
+        border-radius: 12px !important;
+        margin-bottom: 5px !important;
     }
-    /* Optimización para tablets/iPad */
-    @media (max-width: 768px) {
-        .stButton>button {
-            height: 4em;
-            font-size: 1.2rem;
-        }
-    }
+    /* Forzamos colores simples para botones en iPad antiguos */
+    .btn-green button { background-color: #28a745 !important; color: white !important; }
+    .btn-red button { background-color: #dc3545 !important; color: white !important; }
+    .btn-blue button { background-color: #007bff !important; color: white !important; }
+    
+    /* Quitamos el borde rosa de error de Streamlit si aparece */
+    .stException { display: none !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. Lógica de la aplicación
-st.title("🏀 Panel de Scouting - Junior")
+# 3. LÓGICA DE DATOS
+if 'log' not in st.session_state:
+    st.session_state.log = []
 
-if 'historial' not in st.session_state:
-    st.session_state.historial = []
+def registrar_evento(accion):
+    hora = datetime.datetime.now().strftime("%H:%M:%S")
+    st.session_state.log.append({"Hora": hora, "Acción": accion})
 
-col_stats, col_hist = st.columns([2, 1])
+# 4. INTERFAZ SIMPLIFICADA
+st.title("SCOUTING JUNIOR - ADN")
 
-with col_stats:
-    st.subheader("Registro de Acciones")
+col_izq, col_der = st.columns([2, 1])
+
+with col_izq:
+    st.subheader("CONTROL DE PARTIDO")
     
-    # Filas de botones
+    # Fila 1
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("✅ CANASTA 2PT", type="primary"):
-            st.session_state.historial.append({"Acción": "Canasta 2PT", "Hora": pd.Timestamp.now().strftime('%H:%M:%S')})
+        st.markdown('<div class="btn-green">', unsafe_allow_html=True)
+        if st.button("CANASTA 2P"):
+            registrar_evento("C-2PT")
+        st.markdown('</div>', unsafe_allow_html=True)
     with c2:
-        if st.button("❌ FALLO 2PT"):
-            st.session_state.historial.append({"Acción": "Fallo 2PT", "Hora": pd.Timestamp.now().strftime('%H:%M:%S')})
+        st.markdown('<div class="btn-red">', unsafe_allow_html=True)
+        if st.button("FALLO 2P"):
+            registrar_evento("F-2PT")
+        st.markdown('</div>', unsafe_allow_html=True)
 
+    # Fila 2
     c3, c4 = st.columns(2)
     with c3:
-        if st.button("🎯 TRIPLE OK"):
-            st.session_state.historial.append({"Acción": "Triple OK", "Hora": pd.Timestamp.now().strftime('%H:%M:%S')})
+        st.markdown('<div class="btn-green">', unsafe_allow_html=True)
+        if st.button("TRIPLE OK"):
+            registrar_evento("T-OK")
+        st.markdown('</div>', unsafe_allow_html=True)
     with c4:
-        if st.button("🚫 TRIPLE FALLO"):
-            st.session_state.historial.append({"Acción": "Triple Fallo", "Hora": pd.Timestamp.now().strftime('%H:%M:%S')})
+        st.markdown('<div class="btn-red">', unsafe_allow_html=True)
+        if st.button("T-FALLO"):
+            registrar_evento("T-FALLO")
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    if st.button("🗑️ Borrar Última Acción"):
-        if st.session_state.historial:
-            st.session_state.historial.pop()
+    # Fila 3
+    c5, c6 = st.columns(2)
+    with c5:
+        st.markdown('<div class="btn-blue">', unsafe_allow_html=True)
+        if st.button("REBOTE"):
+            registrar_evento("REBOTE")
+        st.markdown('</div>', unsafe_allow_html=True)
+    with c6:
+        if st.button("FALTA"):
+            registrar_evento("FALTA")
+
+    st.write("---")
+    if st.button("BORRAR ÚLTIMO"):
+        if st.session_state.log:
+            st.session_state.log.pop()
             st.rerun()
 
-with col_hist:
-    st.subheader("Eventos")
-    if st.session_state.historial:
-        df = pd.DataFrame(st.session_state.historial)
-        st.dataframe(df, use_container_width=True, hide_index=True)
-        if st.button("Limpiar Sesión"):
-            st.session_state.historial = []
+with col_der:
+    st.subheader("REGISTRO")
+    if st.session_state.log:
+        # IMPORTANTE: Usamos st.table porque st.dataframe rompe iPads antiguos
+        df = pd.DataFrame(st.session_state.log)
+        st.table(df.tail(15)) # Tabla estática simple
+        
+        csv = df.to_csv(index=False).encode('utf-8')
+        st.download_button("DESCARGAR CSV", csv, "scouting.csv", "text/csv")
+        
+        if st.button("LIMPIAR TODO"):
+            st.session_state.log = []
             st.rerun()
     else:
-        st.info("No hay jugadas registradas.")
+        st.write("Sin datos")
