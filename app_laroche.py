@@ -2,201 +2,187 @@ import streamlit as st
 import pandas as pd
 import datetime
 
-# --- CONFIGURACIÓN DE PÁGINA ---
-st.set_page_config(page_title="Junior Stats - Pro Scouting", layout="wide", initial_sidebar_state="collapsed")
+# --- CONFIGURACIÓN ---
+st.set_page_config(page_title="ADN Junior Pro v53", layout="wide", initial_sidebar_state="collapsed")
 
-# --- ESTILOS INSPIRADOS EN HOOPSALYTICS ---
+# --- ESTILOS ---
 st.markdown("""
     <style>
-    /* Botones de Jugadores */
-    .stButton>button { width: 100%; border-radius: 8px; font-weight: bold; height: 3.5em; }
-    /* Botones de Acción (Verde para acierto, Rojo para fallo) */
-    div[data-testid="stHorizontalBlock"] > div:nth-child(1) button { border-left: 10px solid #22c55e; }
-    div[data-testid="stHorizontalBlock"] > div:nth-child(2) button { border-left: 10px solid #ef4444; }
-    /* Contenedores de estadísticas */
-    .stat-card { background-color: #1e293b; color: white; padding: 15px; border-radius: 10px; text-align: center; }
-    .metric-value { font-size: 24px; font-weight: bold; color: #38bdf8; }
+    .stButton>button { width: 100%; border-radius: 10px; font-weight: bold; height: 3.8em; margin-bottom: 5px; }
+    .main-header { background-color: #1e293b; color: white; padding: 15px; border-radius: 12px; text-align: center; }
+    .adn-box { background-color: #fff7ed; border: 2px solid #f97316; padding: 10px; border-radius: 10px; text-align: center; }
+    .court-bg { background-color: #fde68a; border: 2px solid #92400e; border-radius: 15px; padding: 20px; }
+    .player-subtext { font-size: 0.75em; color: #475569; display: block; margin-top: -10px; font-weight: normal; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- DATOS MAESTROS (Corregidos) ---
-JUNIOR_A = ["3.SERRA", "8.MORANA", "15.AMER", "18.GABI", "21.ALÓS", "50.FERRER", "99.PEPE"]
-JUNIOR_B = ["2.LUCAS", "5.ADRIÁN", "9.ANDREU", "11.ALEJ.", "12.DAVID", "23.ANT.", "24.CARLOS", "28.DERIN", "32.GONZALO", "82.MIGUEL"]
+# --- BASES DE DATOS ---
+PLAYERS_DB = {
+    "JUNIOR A": ["3.SERRA", "8.MORANA", "15.AMER", "18.GABI", "21.ALÓS", "50.FERRER", "99.PEPE"],
+    "JUNIOR B": ["2.LUCAS", "5.ADRIÁN", "9.ANDREU", "11.ALEJ.", "12.DAVID", "23.ANT.", "24.CARLOS", "28.DERIN", "32.GONZALO", "82.MIGUEL"]
+}
 
-# --- INICIALIZACIÓN DEL ESTADO (SESSION STATE) ---
+# --- INICIALIZACIÓN ---
 if 'log' not in st.session_state: st.session_state.log = []
 if 'fase' not in st.session_state: st.session_state.fase = "CONFIG"
 if 'pista' not in st.session_state: st.session_state.pista = []
 if 'convocados' not in st.session_state: st.session_state.convocados = []
 if 'pos_n' not in st.session_state: st.session_state.pos_n = 1
 if 'j_sel' not in st.session_state: st.session_state.j_sel = None
+if 'z_sel' not in st.session_state: st.session_state.z_sel = "PINTURA"
 if 'periodo' not in st.session_state: st.session_state.periodo = "1Q"
-if 'pt_count' not in st.session_state: st.session_state.pt_count = 0
-if 'inv_count' not in st.session_state: st.session_state.inv_count = 0
-if 'extra_count' not in st.session_state: st.session_state.extra_count = 0
+if 'adn_pos' not in st.session_state: 
+    st.session_state.adn_pos = {"PT": 0, "PT8": 0, "INV": 0, "ESC": 0, "EXTRA": 0}
 
-# --- LÓGICA DE REGISTRO ---
-def registrar_evento(accion, pts=0, tipo="Local", detalle=""):
+# --- FUNCIONES DE CÁLCULO ---
+def get_player_stats(player_name):
+    pts = sum(d['Pts'] for d in st.session_state.log if d['Jugador'] == player_name and d['Tipo'] == "Local")
+    fouls = sum(1 for d in st.session_state.log if d['Jugador'] == player_name and d['Accion'] == "FALTA")
+    return pts, fouls
+
+def registrar(accion, pts=0, tipo="Local", detalle="", calidad="BUENO"):
     jugador = st.session_state.j_sel if tipo == "Local" else "RIVAL"
-    
-    # Calcular marcador actual
     l_pts = sum(d['Pts'] for d in st.session_state.log if d['Tipo'] == "Local")
     r_pts = sum(d['Pts'] for d in st.session_state.log if d['Tipo'] == "Rival")
     
-    nuevo_evento = {
+    st.session_state.log.append({
         "Pos#": st.session_state.pos_n,
         "Q": st.session_state.periodo,
-        "Hora": datetime.datetime.now().strftime("%H:%M:%S"),
         "Jugador": jugador,
         "Accion": accion,
+        "Zona": st.session_state.z_sel,
         "Pts": pts,
-        "Tipo": tipo,
-        "PT_Pos": st.session_state.pt_count,
-        "Inv_Pos": st.session_state.inv_count,
-        "Extra_Pos": st.session_state.extra_count,
+        "Calidad": calidad,
+        "PT": st.session_state.adn_pos["PT"],
+        "PT8": st.session_state.adn_pos["PT8"],
+        "INV": st.session_state.adn_pos["INV"],
+        "ESC": st.session_state.adn_pos["ESC"],
+        "EXTRA": st.session_state.adn_pos["EXTRA"],
         "Marcador": f"{l_pts + (pts if tipo == 'Local' else 0)}-{r_pts + (pts if tipo == 'Rival' else 0)}",
         "Pista": list(st.session_state.pista),
-        "Detalle": detalle
-    }
+        "Hora": datetime.datetime.now().strftime("%H:%M:%S")
+    })
     
-    st.session_state.log.append(nuevo_evento)
-    # Limpiar selección tras acción de finalización
-    if pts > 0 or "MISS" in accion or "TOV" in accion or "FALTA" in accion:
+    if pts > 0 or "MISS" in accion or "TOV" in accion or accion == "FALTA":
         st.session_state.j_sel = None
     st.toast(f"✅ {accion} - {jugador}")
 
-# --- PANTALLA: CONFIGURACIÓN INICIAL ---
+# --- PANTALLA 1: CONFIGURACIÓN ---
 if st.session_state.fase == "CONFIG":
-    st.title("🏀 Configuración del Partido")
-    equipo_cat = st.radio("Selecciona Categoría:", ["JUNIOR A", "JUNIOR B"], horizontal=True)
-    lista_base = JUNIOR_A if equipo_cat == "JUNIOR A" else JUNIOR_B
+    st.markdown("<div class='main-header'><h1>🏀 CONFIGURACIÓN PARTIDO</h1></div>", unsafe_allow_html=True)
+    c1, c2 = st.columns(2)
+    with c1:
+        st.subheader("Junior A")
+        for p in PLAYERS_DB["JUNIOR A"]:
+            if st.checkbox(p, key=f"c_{p}"):
+                if p not in st.session_state.convocados: st.session_state.convocados.append(p)
+    with c2:
+        st.subheader("Junior B")
+        for p in PLAYERS_DB["JUNIOR B"]:
+            if st.checkbox(p, key=f"cb_{p}"):
+                if p not in st.session_state.convocados: st.session_state.convocados.append(p)
     
-    st.session_state.convocados = st.multiselect(
-        "Jugadores Convocados (Orden Dorsal):", 
-        sorted(lista_base, key=lambda x: int(x.split('.')[0])),
-        default=lista_base
-    )
-    
-    st.session_state.pista = st.multiselect(
-        "Quinteto Inicial (Elegir 5):",
-        st.session_state.convocados,
-        max_selections=5
-    )
-    
-    if st.button("🚀 EMPEZAR SCOUTING", type="primary"):
-        if len(st.session_state.pista) == 5:
-            st.session_state.fase = "PARTIDO"
-            st.rerun()
-        else:
-            st.error("¡Debes seleccionar exactamente 5 jugadores para empezar!")
+    st.divider()
+    if st.session_state.convocados:
+        st.session_state.convocados = sorted(list(set(st.session_state.convocados)), key=lambda x: int(x.split('.')[0]))
+        st.subheader("Quinteto Inicial")
+        st.session_state.pista = st.multiselect("Elige 5:", st.session_state.convocados, max_selections=5)
+        if st.button("🚀 EMPEZAR", type="primary"):
+            if len(st.session_state.pista) == 5:
+                st.session_state.fase = "PARTIDO"
+                st.rerun()
 
-# --- PANTALLA: PARTIDO (INTERFAZ HOOPSALYTICS) ---
+# --- PANTALLA 2: PARTIDO ---
 elif st.session_state.fase == "PARTIDO":
-    # Cabecera de Marcador y Posición
     l_pts = sum(d['Pts'] for d in st.session_state.log if d['Tipo'] == "Local")
     r_pts = sum(d['Pts'] for d in st.session_state.log if d['Tipo'] == "Rival")
     
-    col_score, col_pos = st.columns([2, 1])
-    with col_score:
-        st.markdown(f"""<div class='stat-card'>
-            <span style='font-size: 14px;'>MARCADOR</span><br>
-            <span class='metric-value'>{l_pts} - {r_pts}</span>
-            <span style='margin-left: 20px; font-size: 18px;'>Q: {st.session_state.periodo}</span>
-        </div>""", unsafe_allow_html=True)
-    
-    with col_pos:
-        if st.button(f"🔄 SIGUIENTE POS. (#{st.session_state.pos_n})", type="primary"):
-            st.session_state.pos_n += 1
-            st.session_state.pt_count = 0
-            st.session_state.inv_count = 0
-            st.session_state.extra_count = 0
-            st.rerun()
+    m1, m2, m3 = st.columns([1,2,1])
+    with m1: st.metric("JUNIOR", l_pts)
+    with m2: st.markdown(f"<div class='adn-box'><b>POS #{st.session_state.pos_n} | {st.session_state.periodo}</b><br>PT: {st.session_state.adn_pos['PT']} | INV: {st.session_state.adn_pos['INV']} | ESC: {st.session_state.adn_pos['ESC']}</div>", unsafe_allow_html=True)
+    with m3: st.metric("RIVAL", r_pts)
 
     st.write("")
-    
-    # CUERPO PRINCIPAL
-    col_players, col_main_actions, col_meta = st.columns([1, 2.5, 1])
-    
-    with col_players:
-        st.caption("🏃 EN PISTA")
-        for j in st.session_state.pista:
-            # Resaltar jugador seleccionado
-            color = "primary" if st.session_state.j_sel == j else "secondary"
-            if st.button(f"#{j.split('.')[0]} {j.split('.')[1]}", key=f"p_{j}", type=color):
-                st.session_state.j_sel = j
-                st.rerun()
-        
-        st.divider()
-        if st.button("➕ CAMBIOS", use_container_width=True):
-            st.session_state.fase = "CAMBIOS"
-            st.rerun()
-
-    with col_main_actions:
-        # Fila de Tiro
-        c1, c2, c3 = st.columns(3)
-        with c1: # ACIERTOS
-            if st.button("🎯 2PT MADE"): registrar_evento("2PM", 2)
-            if st.button("🎯 3PT MADE"): registrar_evento("3PM", 3)
-            if st.button("🎯 FT MADE"): registrar_evento("FTM", 1)
-        with c2: # FALLOS
-            if st.button("❌ 2PT MISS"): registrar_evento("2PX", 0)
-            if st.button("❌ 3PT MISS"): registrar_evento("3PX", 0)
-            if st.button("❌ FT MISS"): registrar_evento("FTX", 0)
-        with c3: # REBOTES
-            if st.button("🚀 O-REB"): registrar_evento("OREB", 0)
-            if st.button("📥 D-REB"): registrar_evento("DREB", 0)
-            if st.button("🧤 STEAL"): registrar_evento("STL", 0)
-
-        # Fila de Detalle Hoopsalytics
-        st.caption("🏷️ ETIQUETAS DE ACCIÓN")
-        d1, d2, d3 = st.columns(3)
-        if d1.button("🎨 PAINT TOUCH"): st.session_state.pt_count += 1; registrar_evento("PT", 0)
-        if d2.button("🔄 INVERSIÓN"): st.session_state.inv_count += 1; registrar_evento("INV", 0)
-        if d3.button("➕ EXTRA PASS"): st.session_state.extra_count += 1; registrar_evento("EXTRA", 0)
-        
-        # Fila de Errores y Faltas
-        e1, e2, e3 = st.columns(3)
-        if e1.button("📉 TURNOVER"): registrar_evento("TOV", 0)
-        if e2.button("👤 ASIST"): registrar_evento("AST", 0)
-        if e3.button("🖐️ BLOCK"): registrar_evento("BLK", 0)
-
-    with col_meta:
-        st.caption("⏱️ CONTROL")
-        st.session_state.periodo = st.selectbox("Periodo", ["1Q", "2Q", "3Q", "4Q", "OT"], label_visibility="collapsed")
-        
-        st.write("---")
-        st.caption("🚩 RIVAL")
-        if st.button("Rival +2"): registrar_evento("R-2P", 2, "Rival")
-        if st.button("Rival +3"): registrar_evento("R-3P", 3, "Rival")
-        if st.button("Rival TOV"): registrar_evento("R-TOV", 0, "Rival")
-        
-        st.write("---")
-        if st.button("🗑️ BORRAR ÚLT.", use_container_width=True):
-            if st.session_state.log: st.session_state.log.pop(); st.rerun()
-
-# --- PANTALLA: PANEL DE CAMBIOS (SELECCIÓN TOTAL) ---
-elif st.session_state.fase == "CAMBIOS":
-    st.title("🔄 Sustituciones en Bloque")
-    # Ordenar por dorsal para el panel
-    jugadores_panel = sorted(st.session_state.convocados, key=lambda x: int(x.split('.')[0]))
-    
-    st.write("Selecciona los 5 jugadores que estarán en pista:")
-    nueva_pista = st.multiselect("Quinteto:", jugadores_panel, default=list(st.session_state.pista), max_selections=5)
-    
-    if st.button("✅ CONFIRMAR QUINTETO", type="primary", use_container_width=True):
-        if len(nueva_pista) == 5:
-            st.session_state.pista = nueva_pista
-            st.session_state.fase = "PARTIDO"
-            st.rerun()
-        else:
-            st.warning("Debes seleccionar 5 jugadores.")
-    
-    if st.button("Cancelar"):
-        st.session_state.fase = "PARTIDO"
+    a1, a2, a3, a4, a5, a6 = st.columns(6)
+    if a1.button("🎨 PT"): st.session_state.adn_pos['PT'] += 1; st.rerun()
+    if a2.button("⚡ PT<8"): st.session_state.adn_pos['PT8'] += 1; st.session_state.adn_pos['PT'] += 1; st.rerun()
+    if a3.button("🔄 INV"): st.session_state.adn_pos['INV'] += 1; st.rerun()
+    if a4.button("🙈 ESC"): st.session_state.adn_pos['ESC'] += 1; st.rerun()
+    if a5.button("➕ EXTRA"): st.session_state.adn_pos['EXTRA'] += 1; st.rerun()
+    if a6.button("🆕 POS", type="primary"):
+        st.session_state.pos_n += 1
+        st.session_state.adn_pos = {"PT": 0, "PT8": 0, "INV": 0, "ESC": 0, "EXTRA": 0}
         st.rerun()
 
-# --- TABLA DE DATOS (AL FINAL) ---
+    st.divider()
+    col_p, col_c, col_r = st.columns([1.2, 2.5, 1])
+
+    with col_p:
+        st.caption("🏃 PISTA (Pts | Fal)")
+        for j in st.session_state.pista:
+            p_pts, p_fls = get_player_stats(j)
+            t = "primary" if st.session_state.j_sel == j else "secondary"
+            # Botón con info de faltas y puntos
+            if st.button(f"{j}\n({p_pts}p | {p_fls}f)", key=f"p_{j}", type=t):
+                st.session_state.j_sel = j; st.rerun()
+        if st.button("🔄 CAMBIOS", type="primary"): st.session_state.fase = "CAMBIOS"; st.rerun()
+
+    with col_c:
+        st.markdown("<div class='court-bg'>", unsafe_allow_html=True)
+        z1, z2, z3 = st.columns(3)
+        if z1.button("ESQ IZQ"): st.session_state.z_sel = "ESQ_IZQ"
+        if z2.button("TRIPLE F"): st.session_state.z_sel = "FRONTAL"
+        if z3.button("ESQ DER"): st.session_state.z_sel = "ESQ_DER"
+        m1, m2, m3 = st.columns([1, 2, 1])
+        if m1.button("45º IZQ"): st.session_state.z_sel = "45_IZQ"
+        if m2.button("🏀 PINTURA", type="primary"): st.session_state.z_sel = "PINTURA"
+        if m3.button("45º DER"): st.session_state.z_sel = "45_DER"
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        st.write("")
+        f1, f2, f3 = st.columns(3)
+        if f1.button("✅ 1P"): registrar("1PM", 1)
+        if f2.button("✅ 2P"): registrar("2PM", 2)
+        if f3.button("✅ 3P"): registrar("3PM", 3)
+        
+        b1, b2, b3 = st.columns(3)
+        if b1.button("⭕ MISS (B)"): registrar("MISS", 0, calidad="BUENO")
+        if b2.button("❌ MISS (M)"): registrar("MISS", 0, calidad="MALO")
+        if b3.button("👤 ASIST"): registrar("AST", 0)
+
+    with col_r:
+        st.caption("🧤 ACCIONES / RIVAL")
+        if st.button("🟥 FALTA", type="primary"): registrar("FALTA", 0)
+        d1, d2 = st.columns(2)
+        if d1.button("🚀 OF"): registrar("OREB", 0)
+        if d2.button("📥 DEF"): registrar("DREB", 0)
+        if d1.button("🧤 STL"): registrar("STL", 0)
+        if d2.button("🖐️ BLK"): registrar("BLK", 0)
+        st.divider()
+        if st.button("📉 TOV"): registrar("TOV", 0)
+        if st.button("R+2"): registrar("R2", 2, "Rival")
+        if st.button("R+3"): registrar("R3", 3, "Rival")
+        st.divider()
+        if st.button("🔴 RESET"): 
+            st.session_state.log = []
+            st.session_state.fase = "CONFIG"
+            st.rerun()
+
+# --- PANTALLA 3: CAMBIOS ---
+elif st.session_state.fase == "CAMBIOS":
+    st.title("🔄 PANEL DE CAMBIOS")
+    jug_p = sorted(st.session_state.convocados, key=lambda x: int(x.split('.')[0]))
+    nueva_p = st.multiselect("En pista:", jug_p, default=list(st.session_state.pista), max_selections=5)
+    if st.button("✅ GUARDAR"):
+        if len(nueva_p) == 5:
+            st.session_state.pista = nueva_p
+            st.session_state.fase = "PARTIDO"
+            st.rerun()
+
+# --- SIDEBAR: DATOS ---
 if st.session_state.log:
-    with st.expander("Ver Log de Eventos"):
+    with st.sidebar:
+        st.header("📊 RESUMEN")
         df = pd.DataFrame(st.session_state.log)
-        st.dataframe(df.iloc[::-1], use_container_width=True)
+        st.download_button("📥 EXPORTAR", df.to_csv(index=False), "junior_stats.csv")
+        st.dataframe(df.iloc[::-1])
