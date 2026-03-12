@@ -58,4 +58,78 @@ st.title("📊 METRICAS JUNIOR")
 m1, m2, m3 = st.columns(3)
 m1.metric("LOCAL", p_local)
 m2.metric(rival_name, p_rival)
-m3.
+m3.metric("TIEMPO", obtener_tiempo())
+
+# --- INTERFAZ LOCAL ---
+if st.session_state.inicio and len(quinteto) == 5:
+    st.write("### 1. Jugador")
+    cols_j = st.columns(5)
+    for i, j in enumerate(quinteto):
+        if cols_j[i].button(j, key=f"btn_{j}", use_container_width=True, type="primary" if st.session_state.jugador_sel == j else "secondary"):
+            st.session_state.jugador_sel = j
+
+    if st.session_state.jugador_sel:
+        # ZONA
+        st.write(f"📍 Zona: **{st.session_state.zona_temp}**")
+        z = st.columns(6)
+        if z[0].button("C-IZQ"): st.session_state.zona_temp = "T3-Esq-IZQ"
+        if z[1].button("45-IZQ"): st.session_state.zona_temp = "T3-45-IZQ"
+        if z[2].button("FRON"): st.session_state.zona_temp = "T3-Front"
+        if z[3].button("45-DER"): st.session_state.zona_temp = "T3-45-DER"
+        if z[4].button("C-DER"): st.session_state.zona_temp = "T3-Esq-DER"
+        if z[5].button("PINTURA", type="primary"): st.session_state.zona_temp = "Pintura"
+
+        st.divider()
+        col_stats, col_filo = st.columns(2)
+
+        with col_stats:
+            st.write("**📊 Convencionales**")
+            # FILA 1: Puntos
+            c1, c2, c3 = st.columns(3)
+            if c1.button("✅ 2P", use_container_width=True): acc, pts = "T2-A", 2
+            if c2.button("🎯 3P", use_container_width=True): acc, pts = "T3-A", 3
+            if c3.button("🏀 TL", use_container_width=True): acc, pts = "TL-A", 1
+            
+            # FILA 2: Juego Ofensivo
+            c4, c5, c6 = st.columns(3)
+            if c4.button("❌ Fallo", use_container_width=True): acc, pts = "Fallo", 0
+            if c5.button("🤝 ASIST", use_container_width=True): acc, pts = "AST", 0
+            if c6.button("👟 PERD", use_container_width=True): acc, pts = "TOV", 0
+            
+            # FILA 3: Defensa y Rebote
+            c7, c8, c9 = st.columns(3)
+            if c7.button("🚀 R-OFF", use_container_width=True): acc, pts = "REB-O", 0
+            if c8.button("🛡️ R-DEF", use_container_width=True): acc, pts = "REB-D", 0
+            if c9.button("🧤 ROBO", use_container_width=True): acc, pts = "STL", 0
+            
+            # FILA 4: Otros
+            c10, c11, c12 = st.columns(3)
+            if c10.button("✋ TAPÓN", use_container_width=True): acc, pts = "BLK", 0
+            if c11.button("⚠️ FALTA", use_container_width=True): acc, pts = "PF", 0
+            if c12.button("🎁 F.REC", use_container_width=True): acc, pts = "F-REC", 0
+
+        with col_filo:
+            st.write("**✨ Filosofía**")
+            grid = st.columns(2)
+            for m in especiales:
+                if grid[especiales.index(m)%2].button(m, use_container_width=True):
+                    acc, pts = m, 0
+
+        if 'acc' in locals():
+            st.session_state.log.append({
+                "Min": obtener_tiempo(), "Jugador": st.session_state.jugador_sel,
+                "Zona": st.session_state.zona_temp, "Acción": acc, "Pts": pts, "Rival": rival_name
+            })
+            st.toast(f"Registrado: {acc}")
+            st.rerun()
+
+    if st.button("🔄 Nueva Posesión / Limpiar", use_container_width=True):
+        st.session_state.jugador_sel, st.session_state.zona_temp = None, "N/A"
+        st.rerun()
+
+# --- HISTORIAL ---
+if st.session_state.log:
+    st.divider()
+    df = pd.DataFrame(st.session_state.log)
+    st.dataframe(df.iloc[::-1].head(10), use_container_width=True)
+    
