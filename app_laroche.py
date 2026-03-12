@@ -4,115 +4,100 @@ import time
 
 st.set_page_config(page_title="METRICAS JUNIOR PRO", layout="wide", initial_sidebar_state="collapsed")
 
-# --- ESTILOS PARA EL CAMPO ---
-st.markdown("""
-    <style>
-    .stButton>button { width: 100%; border-radius: 5px; height: 3em; }
-    .pintura-btn>button { background-color: #f0f2f6; border: 2px solid #ff4b4b; height: 5em; font-weight: bold; }
-    .zona-btn>button { background-color: #f9f9f9; border: 1px solid #ccc; }
-    </style>
-    """, unsafe_allow_html=True)
-
-# --- DATOS ---
-fijos_a = ["3.NACHO SERRA", "8.OSCAR MORANA", "15.JOAN AMER", "18.GABI OFICIAL", "21.MARC ALÓS", "50.ADRIAN FERRER", "99.PEPE MÁS"]
-junior_b = ["2.LUCAS MÁS", "5.ADRIAN OJEDA", "9.ANDREU ESTELLÉS", "11.ALEJANDRO PELLICER", "12.DAVID NAVÍO", "23.ANTONIO PERANDRÉS", "24.CARLOS MÁS", "28.DERIN AKYUZ", "32.GONZALO", "82.MIGUEL DOLZ"]
-especiales = ["PT < 8''", "Paint Touch", "Corte", "Transición", "ExtraPass+Tiro", "Tiro Reemplazo", "Stampede"]
-
+# --- ESTADO DE SESIÓN ---
 if 'log' not in st.session_state: st.session_state.log = []
+if 'pos_n' not in st.session_state: st.session_state.pos_n = 1
 if 'inicio' not in st.session_state: st.session_state.inicio = None
 if 'jugador_sel' not in st.session_state: st.session_state.jugador_sel = None
 if 'zona_sel' not in st.session_state: st.session_state.zona_sel = None
 
-def obtener_tiempo():
+def get_time():
     if not st.session_state.inicio: return "00:00"
     t = int(time.time() - st.session_state.inicio)
     return f"{t//60:02d}:{t%60:02d}"
 
-# --- SIDEBAR RIVAL ---
-with st.sidebar:
-    rival = st.text_input("Rival:", "RIVAL").upper()
-    equipo = st.radio("EQUIPO:", ["JUNIOR A", "JUNIOR B"])
-    pool = sorted(fijos_a + junior_b if equipo == "JUNIOR A" else junior_b, key=lambda x: int(x.split('.')[0]))
-    quinteto = st.multiselect("EN PISTA:", pool, max_selections=5)
-    if st.button("🚀 EMPEZAR PARTIDO"):
-        st.session_state.inicio, st.session_state.log = time.time(), []
+# --- DISEÑO DEL CAMPO (HTML/CSS) ---
+# Esto crea una representación visual más parecida a un campo real
+st.markdown("""
+    <style>
+    .court-container { border: 2px solid #333; border-radius: 10px; background-color: #fdf5e6; padding: 15px; }
+    .stButton>button { border-radius: 8px; font-weight: bold; }
+    </style>
+    """, unsafe_allow_html=True)
 
-# --- INTERFAZ ---
-p_l = sum(d['Pts'] for d in st.session_state.log if "Rival" not in d['Jugador'])
-st.title(f"📊 {p_l} - METRICAS JUNIOR - {obtener_tiempo()}")
+# --- CABECERA ---
+pts_l = sum(d['Pts'] for d in st.session_state.log if "Rival" not in d['Jugador'])
+c1, c2, c3 = st.columns([1,1,1])
+c1.metric("POSESIÓN", f"#{st.session_state.pos_n}")
+c2.metric("PUNTOS LOCAL", pts_l)
+c3.metric("TIEMPO", get_time())
 
-if st.session_state.inicio and len(quinteto) == 5:
-    # PASO 1: JUGADOR
-    st.write("### 1. ¿Quién?")
-    cols_j = st.columns(5)
-    for i, j in enumerate(quinteto):
-        if cols_j[i].button(j, key=f"j_{j}", type="primary" if st.session_state.jugador_sel == j else "secondary"):
+# --- CUERPO DE LA APP ---
+if st.session_state.inicio:
+    # 1. SELECTOR DE JUGADOR (SIEMPRE ARRIBA)
+    jugadores = ["3.NACHO", "8.OSCAR", "15.JOAN", "18.GABI", "21.MARC", "50.ADRIAN", "99.PEPE"]
+    cols_j = st.columns(len(jugadores))
+    for idx, j in enumerate(jugadores):
+        if cols_j[idx].button(j, key=f"btn_{j}", type="primary" if st.session_state.jugador_sel == j else "secondary"):
             st.session_state.jugador_sel = j
-            st.session_state.zona_sel = None # Reset zona al cambiar jugador
 
-    if st.session_state.jugador_sel:
-        st.divider()
-        col_c, col_a = st.columns([1.2, 1])
+    st.divider()
 
-        # PASO 2: EL CAMPO (DIBUJO)
-        with col_c:
-            st.write(f"### 2. ¿Dónde? ({st.session_state.jugador_sel})")
+    # 2. COLUMNAS PRINCIPALES (CAMPO IZQ | ACCIONES DER)
+    col_mapa, col_stats = st.columns([1.8, 1])
+
+    with col_mapa:
+        st.subheader("📍 Plano del Campo")
+        with st.container():
+            # FILA TRIPLES
+            z1, z2, z3, z4, z5 = st.columns(5)
+            if z1.button("CORNER L", use_container_width=True): st.session_state.zona_sel = "T3-C-L"
+            if z2.button("45° L", use_container_width=True): st.session_state.zona_sel = "T3-45-L"
+            if z3.button("FRONT", use_container_width=True): st.session_state.zona_sel = "T3-F"
+            if z4.button("45° R", use_container_width=True): st.session_state.zona_sel = "T3-45-R"
+            if z5.button("CORNER R", use_container_width=True): st.session_state.zona_sel = "T3-C-R"
             
-            # Representación visual del campo
-            # Fila Triples (Arco)
-            t1, t2, t3, t4, t5 = st.columns(5)
-            if t1.button("Esq IZQ", key="z1"): st.session_state.zona_sel = "T3-Esq-IZQ"
-            if t2.button("45° IZQ", key="z2"): st.session_state.zona_sel = "T3-45-IZQ"
-            if t3.button("FRONT", key="z3"): st.session_state.zona_sel = "T3-Front"
-            if t4.button("45° DER", key="z4"): st.session_state.zona_sel = "T3-45-DER"
-            if t5.button("Esq DER", key="z5"): st.session_state.zona_sel = "T3-Esq-DER"
-
-            # Media distancia y Pintura
+            # FILA MEDIA / PINTURA
             st.write("")
             m1, pintura, m2 = st.columns([1, 2, 1])
-            if m1.button("Med IZQ", key="z6"): st.session_state.zona_sel = "Med-IZQ"
+            if m1.button("MED L", use_container_width=True): st.session_state.zona_sel = "M-L"
             with pintura:
-                if st.button("🏀 PINTURA 🏀", key="zp", type="primary", use_container_width=True):
-                    st.session_state.zona_sel = "Pintura"
-            if m2.button("Med DER", key="z7"): st.session_state.zona_sel = "Med-DER"
+                if st.button("🏟️ PINTURA (POSTE/ENTRADA) 🏟️", type="primary", use_container_width=True):
+                    st.session_state.zona_sel = "PINTURA"
+            if m2.button("MED R", use_container_width=True): st.session_state.zona_sel = "M-R"
+        
+        st.info(f"Seleccionado: **{st.session_state.jugador_sel or 'Nadie'}** en **{st.session_state.zona_sel or '---'}**")
 
-        # PASO 3: ACCIONES
-        with col_a:
-            if st.session_state.zona_sel:
-                st.write(f"### 3. ¿Qué hizo en {st.session_state.zona_sel}?")
-                acc, pts, finalizar = None, 0, False
-                
-                # Botones de acción grandes para iPad
-                c1, c2 = st.columns(2)
-                if c1.button("✅ CANASTA", use_container_width=True): 
-                    acc = "T3-A" if "T3" in st.session_state.zona_sel else "T2-A"
-                    pts = 3 if "T3" in st.session_state.zona_sel else 2
-                    finalizar = True
-                if c2.button("❌ FALLO", use_container_width=True): acc, pts, finalizar = "Fallo", 0, True
-                
-                st.write("**Otros / Filosofía**")
-                f1, f2 = st.columns(2)
-                if f1.button("🤝 ASISTENCIA"): acc, pts, finalizar = "AST", 0, True
-                if f2.button("👟 PÉRDIDA"): acc, pts, finalizar = "TOV", 0, True
-                
-                for m in especiales:
-                    if st.button(m, use_container_width=True):
-                        acc, pts, finalizar = m, 0, True
-                
-                if finalizar:
-                    st.session_state.log.append({
-                        "Min": obtener_tiempo(), "Jugador": st.session_state.jugador_sel,
-                        "Zona": st.session_state.zona_sel, "Acción": acc, "Pts": pts
-                    })
-                    st.session_state.zona_sel = None # Limpiar zona para encadenar otra acción
-                    st.rerun()
+    with col_stats:
+        st.subheader("📝 Acciones")
+        # MÉTRICAS CONVENCIONALES
+        a1, a2, a3 = st.columns(3)
+        ev, p, finish = None, 0, False
+        if a1.button("✅ CAN", use_container_width=True): 
+            ev = "CANASTA"; p = 3 if "T3" in str(st.session_state.zona_sel) else 2; finish = True
+        if a2.button("❌ FAL", use_container_width=True): ev = "FALLO"; finish = True
+        if a3.button("🏀 TL", use_container_width=True): ev = "TL"; p = 1; finish = True
 
-# --- TABLA Y EFF ---
-if st.session_state.log:
-    st.divider()
-    df = pd.DataFrame(st.session_state.log)
-    st.write("### 🏆 Valoración EFF")
-    # Lógica de EFF simplificada para el directo
-    res = df.groupby('Jugador').agg(PTS=('Pts','sum'), ACC=('Acción','count'))
-    st.dataframe(res.T)
-    st.download_button("📥 Descargar Datos", df.to_csv(index=False), f"partido_{rival}.csv")
+        st.write("**✨ FILOSOFÍA / OTROS**")
+        f1, f2, f3 = st.columns(3)
+        if f1.button("🤝 AST"): ev = "AST"; finish = True
+        if f2.button("👟 TOV"): ev = "TOV"; finish = True
+        if f3.button("🚀 REB"): ev = "REB"; finish = True
+
+        for esp in ["Paint Touch", "Stampede", "ExtraPass", "Corte"]:
+            if st.button(esp, use_container_width=True):
+                st.session_state.log.append({"Pos": st.session_state.pos_n, "Jugador": st.session_state.jugador_sel, "Zona": st.session_state.zona_sel, "Acción": esp, "Pts": 0})
+                st.toast(f"Anotado: {esp}")
+
+        st.divider()
+        if st.button("🏁 SIGUIENTE POSESIÓN", type="primary", use_container_width=True):
+            if ev and finish:
+                st.session_state.log.append({"Pos": st.session_state.pos_n, "Jugador": st.session_state.jugador_sel, "Zona": st.session_state.zona_sel, "Acción": ev, "Pts": p})
+            st.session_state.pos_n += 1
+            st.session_state.zona_sel = None
+            st.rerun()
+
+else:
+    if st.button("🚀 EMPEZAR PARTIDO", type="primary", use_container_width=True):
+        st.session_state.inicio = time.time()
+        st.rerun()
