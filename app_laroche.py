@@ -1,246 +1,190 @@
-import streamlit as st
-import streamlit.components.v1 as components
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Junior STATS</title>
+    <style>
+        body { 
+            background: #0f172a; color: white; font-family: -apple-system, sans-serif; 
+            margin: 0; padding: 10px; -webkit-text-size-adjust: 100%;
+        }
+        .screen { display: none; }
+        .active { display: block; }
+        
+        h2, h3 { text-align: center; margin: 10px 0; color: #60a5fa; text-transform: uppercase; }
+        
+        .btn { 
+            width: 100%; padding: 20px; margin: 5px 0; border: none; border-radius: 12px; 
+            font-weight: bold; font-size: 18px; color: white; cursor: pointer;
+            display: block; box-sizing: border-box; text-align: center;
+        }
+        .btn-blue { background: #2563eb; }
+        .btn-green { background: #16a34a; }
+        .btn-red { background: #dc2626; }
+        .btn-orange { background: #ea580c; }
+        .btn-gray { background: #334155; }
+        
+        .player-card { 
+            background: #1e293b; padding: 15px; margin-bottom: 8px; border-radius: 8px; 
+            border: 2px solid transparent; font-size: 18px;
+        }
+        .selected { border-color: #3b82f6; background: #1e3a8a; }
 
-# Forzamos una configuración que oculte lo máximo posible de la interfaz original
-st.set_page_config(page_title="La Roche Scouting", layout="wide", initial_sidebar_state="collapsed")
+        .main-layout { width: 100%; display: table; border-spacing: 10px; }
+        .layout-col { display: table-cell; vertical-align: top; width: 50%; }
 
-def main():
-    # Este bloque CSS intenta ocultar los mensajes de error de Streamlit que Safari muestra por error
-    st.markdown("""
-        <style>
-            .stAlert, .stException, .element-container:has(.stException) { display: none !important; }
-            header, footer, #MainMenu { visibility: hidden !important; }
-            .stApp { background-color: #0f172a; }
-            /* Intentamos tapar el error rojo superior si aparece */
-            div[data-testid="stDecoration"] { display: none; }
-        </style>
-    """, unsafe_allow_html=True)
+        .court { 
+            width: 100%; background: #1e293b; border: 2px solid #475569; 
+            position: relative; border-radius: 10px; overflow: hidden; height: 380px;
+        }
+        .marker { 
+            position: absolute; width: 14px; height: 14px; border-radius: 50%; 
+            transform: translate(-50%, -50%); border: 1px solid white; 
+        }
 
-    # App completa en HTML/JS compatible con iPad antiguo (ES5)
-    html_app = """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-        <style>
-            body { background: #0f172a; color: white; font-family: -apple-system, sans-serif; margin: 0; padding: 10px; }
-            .screen { display: none; }
-            .active { display: block; }
-            .btn { 
-                width: 100%; padding: 18px; margin: 5px 0; border: none; border-radius: 10px; 
-                font-weight: bold; font-size: 16px; color: white; cursor: pointer;
-                -webkit-appearance: none;
-            }
-            .btn-blue { background: #2563eb; }
-            .btn-green { background: #16a34a; }
-            .btn-red { background: #dc2626; }
-            .btn-orange { background: #ea580c; }
-            .btn-gray { background: #334155; }
-            
-            .grid-2 { display: table; width: 100%; border-spacing: 5px; }
-            .row { display: table-row; }
-            .cell { display: table-cell; width: 50%; vertical-align: top; }
-            
-            .player-card { 
-                background: #1e293b; padding: 12px; margin-bottom: 5px; border-radius: 6px; 
-                text-align: center; border: 2px solid transparent;
-            }
-            .selected { border-color: #2563eb; background: #1e3a8a; }
-            
-            .court { 
-                width: 100%; aspect-ratio: 1/1.2; background: #1e293b; border: 2px solid #475569; 
-                position: relative; border-radius: 10px; overflow: hidden;
-            }
-            .marker { position: absolute; width: 12px; height: 12px; border-radius: 50%; transform: translate(-50%, -50%); border: 1px solid white; }
-            
-            input { width: 100%; padding: 15px; margin: 5px 0; border-radius: 8px; border: 1px solid #334155; background: #1e293b; color: white; box-sizing: border-box; }
-            #log-output { width: 100%; height: 100px; background: #000; color: #0f0; font-family: monospace; font-size: 10px; margin-top: 10px; }
-        </style>
-    </head>
-    <body>
+        .mini-p { 
+            display: inline-block; width: 18%; margin: 1%; padding: 12px 0; 
+            text-align: center; background: #334155; border-radius: 6px; font-weight: bold;
+        }
+        .p-active { background: #2563eb; border: 2px solid white; }
 
-    <!-- 1. INICIO -->
+        input { width: 100%; padding: 15px; margin: 10px 0; border-radius: 8px; border: 1px solid #334155; background: #1e293b; color: white; box-sizing: border-box; }
+        #log-view { width: 100%; height: 100px; background: #000; color: #0f0; font-family: monospace; padding: 10px; border-radius: 5px; overflow-y: scroll; }
+    </style>
+</head>
+<body>
+
     <div id="s1" class="screen active">
-        <h2 style="text-align:center;">JUNIOR LA ROCHE</h2>
-        <button class="btn btn-blue" onclick="toConv('A')">PARTIDO JUNIOR A (A+B)</button>
-        <button class="btn btn-blue" onclick="toConv('B')">PARTIDO JUNIOR B</button>
+        <h2>JUNIOR STATS</h2>
+        <button class="btn btn-blue" onclick="loadRoster('A')">JUNIOR A (A + B)</button>
+        <button class="btn btn-blue" onclick="loadRoster('B')">JUNIOR B</button>
     </div>
 
-    <!-- 2. CONVOCATORIA -->
     <div id="s2" class="screen">
         <h3>CONVOCATORIA</h3>
-        <div id="roster-box"></div>
-        <input type="text" id="rival" placeholder="Nombre Rival">
-        <button class="btn btn-green" onclick="toMatch()">EMPEZAR PARTIDO</button>
-        <button class="btn btn-gray" onclick="location.reload()">ATRAS</button>
+        <div id="list-box"></div>
+        <input type="text" id="rival-name" placeholder="Nombre Rival">
+        <button class="btn btn-green" onclick="goMatch()">INICIAR PARTIDO</button>
+        <button class="btn btn-gray" onclick="location.reload()">ATRÁS</button>
     </div>
 
-    <!-- 3. PARTIDO -->
     <div id="s3" class="screen">
-        <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:5px;">
-            <span id="label-rival"></span>
-            <span id="score" style="color:#60a5fa; font-weight:bold;">PTS: 0</span>
+        <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+            <span id="rival-label"></span>
+            <span id="total-pts" style="color:#60a5fa; font-weight:bold;">PTS: 0</span>
         </div>
-        
-        <div id="on-court-line" style="display:flex; gap:3px; margin-bottom:10px;"></div>
 
-        <div class="grid-2">
+        <div id="on-court-line"></div>
+
+        <div class="main-layout">
             <div class="row">
-                <div class="cell">
-                    <div class="court" id="court" onclick="mapClick(event)">
-                        <div style="position:absolute; width:40%; height:30%; left:30%; top:0; border:1px solid #444;"></div>
-                        <div id="shots"></div>
+                <div class="layout-col">
+                    <div class="court" id="court-img" onclick="handleCourt(event)">
+                        <div style="position:absolute; width:40%; height:30%; left:30%; top:0; border:1px solid #555;"></div>
+                        <div id="shots-layer"></div>
                     </div>
                 </div>
-                <div class="cell">
-                    <button class="btn btn-gray" style="padding:12px" onclick="stat('REB')">REB</button>
-                    <button class="btn btn-gray" style="padding:12px" onclick="stat('AST')">AST</button>
-                    <button class="btn btn-gray" style="padding:12px" onclick="stat('ROBO')">ROBO</button>
-                    <button class="btn btn-orange" style="padding:12px" onclick="stat('PERD')">PERD</button>
-                    <button class="btn btn-red" style="padding:12px" onclick="stat('FALTA')">FALTA</button>
-                    <button class="btn btn-blue" style="padding:12px" onclick="stat('TL_OK')">TL ✅</button>
-                    <button class="btn btn-gray" style="padding:12px" onclick="stat('TL_ERR')">TL ❌</button>
+                <div class="layout-col">
+                    <button class="btn btn-gray" onclick="addStat('REB')">REB</button>
+                    <button class="btn btn-gray" onclick="addStat('AST')">AST</button>
+                    <button class="btn btn-orange" onclick="addStat('PERD')">PERD</button>
+                    <button class="btn btn-red" onclick="addStat('FALTA')">FALTA</button>
+                    <button class="btn btn-blue" onclick="addStat('TL_IN')">TL ✅</button>
                 </div>
             </div>
         </div>
-        <button class="btn btn-green" style="margin-top:10px;" onclick="doSub()">CAMBIO (🔄)</button>
-        <button class="btn btn-gray" onclick="exportData()">COPIAR RESULTADOS</button>
-        <textarea id="log-output" readonly></textarea>
+
+        <button class="btn btn-green" onclick="changePlayer()">CAMBIO (🔄)</button>
+        <div id="log-view">Registro...</div>
+        <button class="btn btn-gray" onclick="copyAll()">VER RESUMEN</button>
     </div>
 
-    <!-- MODAL TIRO -->
-    <div id="s-shot" class="screen" style="position:fixed; inset:0; background:rgba(0,0,0,0.95); z-index:999; padding:20px;">
-        <h2 style="text-align:center;">TIRO DE <span id="shot-player"></span></h2>
-        <button class="btn btn-green" style="padding:40px; margin-bottom:20px;" onclick="shot(true)">ANOTADO</button>
-        <button class="btn btn-red" style="padding:40px;" onclick="shot(false)">FALLADO</button>
+    <div id="s-shot" class="screen" style="position:fixed; inset:0; background:rgba(0,0,0,0.95); z-index:99; padding:20px;">
+        <h2 id="shot-title">TIRO</h2>
+        <button class="btn btn-green" style="padding:50px; margin-bottom:20px;" onclick="processShot(true)">ANOTADO</button>
+        <button class="btn btn-red" style="padding:50px;" onclick="processShot(false)">FALLADO</button>
     </div>
 
     <script>
-        var playersA = [{d:"03",n:"SERRA"},{d:"08",n:"MORANA"},{d:"15",n:"AMER"},{d:"18",n:"GABI"},{d:"21",n:"ALÓS"},{d:"50",n:"FERRER"},{d:"99",n:"PEPE M"}];
-        var playersB = [{d:"02",n:"LUCAS M"},{d:"05",n:"ADRIAN O"},{d:"09",n:"ANDREU E"},{d:"11",n:"ALEJANDRO"},{d:"12",n:"DAVID N"},{d:"23",n:"ANTONIO P"},{d:"24",n:"CARLOS M"},{d:"28",n:"DERIN A"},{d:"32",n:"GONZALO R"},{d:"82",n:"MIGUEL D"}];
-        
-        var currentRoster = [];
-        var convocados = [];
-        var quinteto = [];
-        var selectedP = null;
-        var lastXY = null;
-        var logs = [];
-        var puntos = 0;
+        var pA = [{d:"03",n:"SERRA"},{d:"08",n:"MORANA"},{d:"15",n:"AMER"},{d:"18",n:"GABI"},{d:"21",n:"ALÓS"},{d:"50",n:"FERRER"},{d:"99",n:"PEPE MÁS"}];
+        var pB = [{d:"02",n:"LUCAS M"},{d:"05",n:"ADRIAN O"},{d:"09",n:"ANDREU E"},{d:"11",n:"ALEJANDRO"},{d:"12",n:"DAVID N"},{d:"23",n:"ANTONIO P"},{d:"24",n:"CARLOS M"},{d:"28",n:"DERIN A"},{d:"32",n:"GONZALO R"},{d:"82",n:"MIGUEL D"}];
+        var currentRoster = [], convocados = [], quinteto = [], activeDorsal = "", totalPoints = 0, history = [];
 
-        function toConv(t) {
-            currentRoster = (t=='A') ? playersA.concat(playersB) : playersB;
-            var box = document.getElementById('roster-box');
-            box.innerHTML = "";
-            for(var i=0; i<currentRoster.length; i++) {
-                var p = currentRoster[i];
-                var d = document.createElement('div');
-                d.className = 'player-card';
-                d.id = "pc-" + p.d;
-                d.innerHTML = "#" + p.d + " " + p.n;
-                d.onclick = (function(pl, div){ return function(){ toggle(pl, div); }})(p, d);
-                box.appendChild(d);
-            }
+        function loadRoster(m) {
+            currentRoster = (m == 'A') ? pA.concat(pB) : pB;
+            var h = "";
+            for(var i=0; i<currentRoster.length; i++) h += '<div class="player-card" id="card-'+currentRoster[i].d+'" onclick="toggleP('+i+')">#'+currentRoster[i].d+' '+currentRoster[i].n+'</div>';
+            document.getElementById('list-box').innerHTML = h;
             show('s2');
         }
 
-        function toggle(p, div) {
-            var idx = convocados.indexOf(p);
-            if(idx > -1) { convocados.splice(idx,1); div.className = 'player-card'; }
-            else { convocados.push(p); div.className = 'player-card selected'; }
+        function toggleP(i) {
+            var p = currentRoster[i], pos = convocados.indexOf(p);
+            if(pos > -1) { convocados.splice(pos, 1); document.getElementById('card-'+p.d).className = "player-card"; }
+            else { convocados.push(p); document.getElementById('card-'+p.d).className = "player-card selected"; }
         }
 
-        function toMatch() {
+        function goMatch() {
             if(convocados.length < 5) { alert("Mínimo 5 jugadores"); return; }
-            quinteto = convocados.slice(0, 5);
-            selectedP = quinteto[0].d;
-            document.getElementById('label-rival').innerText = "Vs " + document.getElementById('rival').value;
-            renderQ();
-            show('s3');
+            quinteto = convocados.slice(0, 5); activeDorsal = quinteto[0].d;
+            document.getElementById('rival-label').innerText = "Vs " + document.getElementById('rival-name').value;
+            refreshQ(); show('s3');
         }
 
-        function renderQ() {
-            var box = document.getElementById('on-court-line');
-            box.innerHTML = "";
+        function refreshQ() {
+            var h = "";
             for(var i=0; i<quinteto.length; i++) {
-                var p = quinteto[i];
-                var d = document.createElement('div');
-                d.style.flex = "1";
-                d.style.padding = "10px 2px";
-                d.style.textAlign = "center";
-                d.style.borderRadius = "4px";
-                d.style.background = (selectedP == p.d) ? "#2563eb" : "#334155";
-                d.innerHTML = "#" + p.d;
-                d.onclick = (function(id){ return function(){ selectedP = id; renderQ(); }})(p.d);
-                box.appendChild(d);
+                var cls = (quinteto[i].d == activeDorsal) ? "mini-p p-active" : "mini-p";
+                h += '<div class="'+cls+'" onclick="setActive(\''+quinteto[i].d+'\')">#'+quinteto[i].d+'</div>';
             }
+            document.getElementById('on-court-line').innerHTML = h;
         }
 
-        function mapClick(e) {
-            var r = document.getElementById('court').getBoundingClientRect();
-            lastXY = { x: ((e.clientX - r.left)/r.width)*100, y: ((e.clientY - r.top)/r.height)*100 };
-            document.getElementById('shot-player').innerText = "#" + selectedP;
+        function setActive(d) { activeDorsal = d; refreshQ(); }
+
+        function handleCourt(e) {
+            var r = document.getElementById('court-img').getBoundingClientRect();
+            lastPos = { x: ((e.clientX - r.left)/r.width)*100, y: ((e.clientY - r.top)/r.height)*100 };
+            document.getElementById('shot-title').innerText = "TIRO #" + activeDorsal;
             show('s-shot');
         }
 
-        function shot(ok) {
-            var val = (lastXY.y > 35) ? 2 : 3;
-            if(!ok) val = 0;
-            puntos += val;
-            logs.push("#" + selectedP + " Tiro " + (ok?"OK":"FALLO") + " (" + (val||"") + "pts)");
-            
-            var m = document.createElement('div');
-            m.className = 'marker';
-            m.style.left = lastXY.x + "%"; m.style.top = lastXY.y + "%";
-            m.style.background = ok ? "#22c55e" : "#ef4444";
-            document.getElementById('shots').appendChild(m);
-            
-            document.getElementById('score').innerText = "PTS: " + puntos;
-            updateLog();
+        function processShot(ok) {
+            var p = (lastPos.y > 38) ? 2 : 3; if(!ok) p = 0;
+            totalPoints += p;
+            history.push("#" + activeDorsal + ": Tiro " + (ok?"OK":"F") + " ("+p+"p)");
+            var m = document.createElement('div'); m.className = "marker"; m.style.left = lastPos.x + "%"; m.style.top = lastPos.y + "%";
+            m.style.background = ok ? "#22c55e" : "#ef4444"; document.getElementById('shots-layer').appendChild(m);
+            finish();
+        }
+
+        function addStat(t) { if(t == 'TL_IN') totalPoints += 1; history.push("#" + activeDorsal + ": " + t); finish(); }
+
+        function finish() {
+            document.getElementById('total-pts').innerText = "PTS: " + totalPoints;
+            document.getElementById('log-view').innerText = history.slice(-5).join("\n");
             show('s3');
         }
 
-        function stat(t) {
-            if(t == 'TL_OK') puntos += 1;
-            logs.push("#" + selectedP + " " + t);
-            document.getElementById('score').innerText = "PTS: " + puntos;
-            updateLog();
-        }
-
-        function doSub() {
-            var bench = convocados.filter(function(p){ 
-                for(var j=0; j<quinteto.length; j++) if(quinteto[j].d == p.d) return false;
-                return true;
-            });
-            if(bench.length == 0) { alert("Banquillo vacío"); return; }
-            var m = "CAMBIO: Sale #" + selectedP + ". ¿Quién entra?\\n";
-            for(var i=0; i<bench.length; i++) m += (i+1) + ": #" + bench[i].d + "\\n";
-            var r = prompt(m);
+        function changePlayer() {
+            var bench = convocados.filter(function(p){ return !quinteto.some(function(q){return q.d == p.d}) });
+            var msg = "Sustituir #" + activeDorsal + " por:\n";
+            for(var i=0; i<bench.length; i++) msg += (i+1) + ": #" + bench[i].d + "\n";
+            var r = prompt(msg);
             if(r && bench[r-1]) {
-                for(var i=0; i<quinteto.length; i++) if(quinteto[i].d == selectedP) quinteto[i] = bench[r-1];
-                selectedP = bench[r-1].d;
-                renderQ();
+                for(var i=0; i<quinteto.length; i++) if(quinteto[i].d == activeDorsal) quinteto[i] = bench[r-1];
+                activeDorsal = bench[r-1].d; refreshQ();
             }
         }
 
-        function updateLog() { document.getElementById('log-output').value = logs.slice(-5).join("\\n"); }
         function show(id) {
             var ss = document.getElementsByClassName('screen');
-            for(var i=0; i<ss.length; i++) ss[i].className = 'screen';
-            document.getElementById(id).className = 'screen active';
+            for(var i=0; i<ss.length; i++) ss[i].className = "screen";
+            document.getElementById(id).className = "screen active";
         }
-        function exportData() {
-            var t = "RESULTADOS:\\n" + logs.join("\\n");
-            document.getElementById('log-output').value = t;
-            alert("Datos copiados al cuadro inferior. Cópialos manualmente para enviar.");
-        }
-    </script>
-    </body>
-    </html>
-    """
-    
-    # El iframe de Streamlit que contiene nuestra app compatible
-    components.html(html_app, height=850, scrolling=False)
 
-if __name__ == "__main__":
-    main()
+        function copyAll() { alert(history.join("\n")); }
+    </script>
+</body>
+</html>
